@@ -5,6 +5,7 @@ package main
 import (
 	"math"
 	"math/rand"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -15,7 +16,7 @@ const (
 	winWidth      = 1280
 	winHeight     = 720
 	minWarpFactor = 0.1
-	numStars      = 300
+	numStars      = 30000
 	centerX       = winWidth / 2
 	centerY       = winHeight / 2
 )
@@ -74,12 +75,12 @@ func newStar() star {
 	dy := math.Sin(angle)
 
 	// d = random.uniform(25 + TRAIL_LENGTH, 100)
-	d := rand.Intn(100) + 25 //+ traillength
+	//d := rand.Intn(100) + 25 //+ traillength
 
 	// pos = centerx + dx * d, centery + dy * d
 	pos := position{
-		x: centerX + dx*float64(d),
-		y: centerY + dy*float64(d),
+		x: centerX,
+		y: centerY ,
 	}
 
 	// vel = speed * dx, speed * dy
@@ -157,33 +158,45 @@ func main() {
 
 	var elapsedTime float32
 	pixels := make([]byte, winWidth*winHeight*4)
-	starField := make([]star, numStars)
+	var wg sync.WaitGroup
+	starsChan := make(chan *stars, 1)
+	defer close(starsChan)
+
+	wg.Add(1)
+	go func(ch chan<- *stars, numStars int) {
+		defer wg.Done()
+		all := &stars{}
+		for i := 0; i < numStars; i++ {
+			all.stars = append(all.stars, newStar())
+		}
+		ch <- all
+	}(starsChan, numStars)
+
 	all := &stars{}
-
-	for i := 0; i < len(starField); i++ {
-		all.stars = append(all.stars, newStar())
-	}
-
 	for {
-		frameStart := time.Now()
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch event.(type) {
 			case *sdl.QuitEvent:
 				return
 			}
 		}
+		if len(starsChan) > 0 {
+			all = <-starsChan
+		}
+		if len(all.stars) > 0 {
+			frameStart := time.Now()
 
-		all.update(elapsedTime)
-		all.draw(pixels)
-
-		tex.Update(nil, unsafe.Pointer(&pixels[0]), winWidth*4)
-		renderer.Copy(tex, nil, nil)
-		renderer.Present()
-		clear(pixels)
-		elapsedTime = float32(time.Since(frameStart).Seconds() * 1000)
-		if elapsedTime < 7 {
-			sdl.Delay(7 - uint32(elapsedTime))
+			all.update(elapsedTime)
+			all.draw(pixels)
+			tex.Update(nil, unsafe.Pointer(&pixels[0]), winWidth*4)
+			renderer.Copy(tex, nil, nil)
+			renderer.Present()
+			clear(pixels)
 			elapsedTime = float32(time.Since(frameStart).Seconds() * 1000)
+			if elapsedTime < 7 {
+				sdl.Delay(7 - uint32(elapsedTime))
+				elapsedTime = float32(time.Since(frameStart).Seconds() * 1000)
+			}
 		}
 	}
 }
