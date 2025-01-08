@@ -2,92 +2,99 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"sdl_learn/logger"
-	"time"
+	"sdl_learn/gobject"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
 
+// Global consts
 const (
-	defaultTitle = "test"
-	winWidth     = 1280
-	winHeight    = 720
-	centerX      = winWidth / 2
-	centerY      = winHeight / 2
+	FPS          uint32 = 60
+	DelayTime    uint32 = uint32(1000.0 / FPS)
+	WindowWidth         = 1280
+	WindowHeight        = 720
+	WindowTitle         = "Game"
 )
 
-func main() {
-	err := sdl.Init(sdl.INIT_EVERYTHING)
-	if err != nil {
-		logger.Error("sdl unable to init: %s", err.Error())
-		os.Exit(1)
-	}
-	defer sdl.Quit()
+// Globals, maybe someday wrapped to struct but now less to type
+var (
+	win       *sdl.Window
+	rend      *sdl.Renderer
+	event     sdl.Event
+	err       error
+	isRunning = true
+	// Maybe later
+	gameObjects map[string]*gobject.Gobject
+)
 
-	sdl.SetHint(sdl.HINT_RENDER_SCALE_QUALITY, "1")
-
-	window, err := sdl.CreateWindow(defaultTitle, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, int32(winWidth), int32(winHeight), sdl.WINDOW_SHOWN)
+// Error checker
+func perror(err error) {
 	if err != nil {
-		logger.Error("sdl unable to create window: %s", err.Error())
-		os.Exit(1)
+		panic(err)
 	}
-	setWindowTitle(window)
-	defer window.Destroy()
-
-	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
-	if err != nil {
-		logger.Error("sdl unable to create renderer: %s", err.Error())
-		os.Exit(1)
-	}
-	defer renderer.Destroy()
-
-	tex, err := renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STREAMING, int32(winWidth), int32(winHeight))
-	if err != nil {
-		logger.Error("sdl unable to create texture: %s", err.Error())
-		os.Exit(1)
-	}
-	defer tex.Destroy()
 }
 
-func setWindowTitle(window *sdl.Window) {
-	cursor := sdl.Point{}
-	var keyboard []uint8
-	quit := true
-	for quit {
-		for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
-			if e.GetType() == sdl.QUIT {
-				quit = false
-				window.Destroy()
+func main() {
+	// Init SDL and create window
+	err = sdl.Init(sdl.INIT_VIDEO)
+	perror(err)
+
+	win, err = sdl.CreateWindow(
+		WindowTitle,
+		sdl.WINDOWPOS_CENTERED,
+		sdl.WINDOWPOS_CENTERED,
+		WindowWidth,
+		WindowHeight,
+		sdl.WINDOW_SHOWN,
+	)
+	perror(err)
+	defer win.Destroy()
+
+	// Create renderer
+	rend, err = sdl.CreateRenderer(win, -1, sdl.RENDERER_ACCELERATED|sdl.RENDERER_PRESENTVSYNC)
+	perror(err)
+	defer rend.Destroy()
+
+	// Create player
+	player := gobject.NewGobject(rend, "assets/images.png", "player", WindowWidth/2, WindowHeight-200)
+	// Init gameObjects map
+	gameObjects = make(map[string]*gobject.Gobject)
+	gameObjects[player.Id] = player
+
+	// Game loop
+	for isRunning {
+
+		frameStartTime := sdl.GetTicks()
+
+		// Handle event queue
+		for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+			switch t := event.(type) {
+			case *sdl.QuitEvent:
+				fmt.Println(t)
+				isRunning = false
 			}
-			switch event := e.(type) {
-			case *sdl.KeyboardEvent:
-				fmt.Printf("%d \n", event.Keysym)
-			}
-
-			switch e.GetType() {
-			case sdl.MOUSEMOTION:
-				motion := e.(*sdl.MouseMotionEvent)
-				cursor.X = motion.X
-				cursor.Y = motion.Y
-
-			case sdl.KEYDOWN:
-				fallthrough
-			case sdl.KEYUP:
-				keyboard = sdl.GetKeyboardState()
-			}
-			title := defaultTitle
-			title += " | "
-
-			title += time.Now().Format("2006-01-02 15:04:05")
-			title += " | "
-			title += "MX=" + fmt.Sprint(cursor.X)
-			title += " | "
-			title += "MY=" + fmt.Sprint(cursor.Y)
-			title += " | "
-			title += "UP=" + fmt.Sprint(keyboard)
-
-			window.SetTitle(title)
 		}
-	}
+
+		// Clear screen
+		rend.SetDrawColor(0, 100, 155, 0)
+		rend.Clear()
+
+		// Update
+		player.Update()
+
+		// Render
+		player.Draw(rend)
+
+		rend.Present()
+
+		// If too fast add delay
+		frameTime := sdl.GetTicks() - frameStartTime
+		if frameTime < DelayTime {
+			sdl.Delay(uint32(DelayTime - frameTime))
+		}
+
+	} // End of isRunning
+
+	player.Free()
+	sdl.Quit()
 }
