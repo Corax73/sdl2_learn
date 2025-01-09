@@ -56,7 +56,7 @@ func main() {
 	defer rend.Destroy()
 
 	// Create player
-	player := gobject.NewGobject(rend, "assets/images.png", "player", WindowWidth/2, WindowHeight-200)
+	player := gobject.NewGobject(rend, "assets/battleship.png", "player", WindowWidth/2, WindowHeight * 0.8)
 	// Init gameObjects map
 	gameObjects = make(map[string]*gobject.Gobject)
 	gameObjects[player.Id] = player

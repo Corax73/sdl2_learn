@@ -22,7 +22,7 @@ type Gobject struct {
 	// Movement speed
 	Speed int32
 	// Sprite size, not full image size
-	Width, Height int32
+	fromX, fromY, Width, Height int32
 	// Holds image
 	Texture *sdl.Texture
 	// Part of the spritesheet
@@ -68,13 +68,15 @@ func (gob *Gobject) Free() {
 // Update updates object state
 func (gob *Gobject) Update() {
 	keyStates := sdl.GetKeyboardState()
-	gob.Speed = 4
+	gob.Speed = 20
 
 	if keyStates[sdl.SCANCODE_LEFT] == 1 {
+		gob.fromX = gob.X
 		gob.Direction.X = -1
 		gob.X -= gob.Speed
 		sdl.Delay(50)
 	} else if keyStates[sdl.SCANCODE_RIGHT] == 1 {
+		gob.fromX = gob.X
 		gob.Direction.X = 1
 		gob.X += gob.Speed
 		sdl.Delay(50)
@@ -94,15 +96,6 @@ func (gob *Gobject) Rect() sdl.Rect {
 
 // Draw object
 func (gob *Gobject) Draw(r *sdl.Renderer) {
-	/*// Part of the spritesheet
-	gob.Src = sdl.Rect{X: gob.X, Y: gob.Y, W: gob.Width, H: gob.Height}
-	// Part of the screen where to draw
-	gob.Dest = sdl.Rect{X: gob.X, Y: gob.Y, W: gob.Width, H: gob.Height}
-	r.Copy(gob.Texture, &gob.Src, &gob.Dest)*/
-	err := r.SetDrawColor(255, 0, 0, sdl.ALPHA_TRANSPARENT)
-	if err != nil {
-		panic(err)
-	}
-	rect := gob.Rect()
-	r.FillRect(&rect)
+	dst := gob.Rect()
+	r.Copy(gob.Texture, nil, &dst)
 }
