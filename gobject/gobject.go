@@ -1,6 +1,10 @@
 package gobject
 
 import (
+	"context"
+	"crypto/rand"
+	"math/big"
+
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -22,7 +26,7 @@ type Gobject struct {
 	// Movement speed
 	Speed int32
 	// Sprite size, not full image size
-	fromX, fromY, Width, Height int32
+	MaxX, MaxY, Width, Height int32
 	// Holds image
 	Texture *sdl.Texture
 	// Part of the spritesheet
@@ -30,13 +34,13 @@ type Gobject struct {
 	// Part of the screen where to draw
 	Dest sdl.Rect
 	// Is object moving
-	IsMoving bool
+	IsMoving  bool
 	Direction sdl.FPoint
 }
 
 // NewGobject creates new game object
-func NewGobject(r *sdl.Renderer, file, id string, x, y int32) *Gobject {
-	gob := &Gobject{Filename: file, X: x, Y: y, Speed: 1}
+func NewGobject(r *sdl.Renderer, file, id string, x, y, maxX, maxY int32) *Gobject {
+	gob := &Gobject{Filename: file, X: x, Y: y, MaxX: maxX, MaxY: maxY, Speed: 1}
 	gob.Load(r)
 	return gob
 }
@@ -66,22 +70,23 @@ func (gob *Gobject) Free() {
 }
 
 // Update updates object state
-func (gob *Gobject) Update() {
+func (gob *Gobject) Update(r *sdl.Renderer) {
 	keyStates := sdl.GetKeyboardState()
 	gob.Speed = 20
-
 	if keyStates[sdl.SCANCODE_LEFT] == 1 {
-		gob.fromX = gob.X
-		gob.Direction.X = -1
-		gob.X -= gob.Speed
+		if (gob.X - gob.Speed) > 0 {
+			gob.X -= gob.Speed
+		}
 		sdl.Delay(50)
 	} else if keyStates[sdl.SCANCODE_RIGHT] == 1 {
-		gob.fromX = gob.X
-		gob.Direction.X = 1
-		gob.X += gob.Speed
+		if (gob.X + gob.Speed + 70) < gob.MaxX {
+			gob.X += gob.Speed
+		}
 		sdl.Delay(50)
 	}
-
+	if keyStates[sdl.SCANCODE_SPACE] == 1 {
+		gob.ShootUp(r)
+	}
 }
 
 func (gob *Gobject) Rect() sdl.Rect {
@@ -98,4 +103,79 @@ func (gob *Gobject) Rect() sdl.Rect {
 func (gob *Gobject) Draw(r *sdl.Renderer) {
 	dst := gob.Rect()
 	r.Copy(gob.Texture, nil, &dst)
+}
+
+func (gob *Gobject) ShootUp(r *sdl.Renderer) {
+	r.SetDrawColor(255, 255, 0, 255)
+	r.DrawLine(gob.X+50, gob.Y-5, gob.X+50, gob.Y-300)
+}
+
+func (gob *Gobject) ShootDown(r *sdl.Renderer) {
+	r.SetDrawColor(0, 255, 0, 0)
+	r.DrawLine(gob.X+50, gob.Y-20, gob.X+50, gob.Y+300)
+}
+
+func (gob *Gobject) RandomMoving(r *sdl.Renderer) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func(ctx context.Context) {
+		var min int32 = 20
+		gob.Speed = min
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			for i := 0; i < 2; i++ {
+				sdl.Delay(1500)
+				maxRand := big.NewInt(4)
+				if val, err := rand.Int(rand.Reader, maxRand); err == nil && val.Int64() > 2 {
+					gob.ShootDown(r)
+					sdl.Delay(1500)
+					if (gob.X - gob.Speed) > 0 {
+						gob.X -= gob.Speed
+						sdl.Delay(1500)
+					}
+					if (gob.Y + gob.Speed + 100) < gob.MaxY {
+						gob.Y += gob.Speed
+						sdl.Delay(1500)
+					}
+					if (gob.X + gob.Speed + 200) < gob.MaxX {
+						gob.X += gob.Speed
+						sdl.Delay(1500)
+					}
+					if (gob.Y - gob.Speed) > 0 {
+						gob.Y -= gob.Speed
+						sdl.Delay(1500)
+					}
+				} else {
+					if (gob.X + gob.Speed + 200) < gob.MaxX {
+						gob.X += gob.Speed
+						sdl.Delay(1500)
+					}
+					if (gob.Y - gob.Speed) > 0 {
+						gob.Y -= gob.Speed
+						sdl.Delay(1500)
+					}
+					if (gob.X - gob.Speed) > 0 {
+						gob.X -= gob.Speed
+						sdl.Delay(1500)
+					}
+					if (gob.Y + gob.Speed + 100) < gob.MaxY {
+						gob.Y += gob.Speed
+						sdl.Delay(1500)
+					}
+				}
+				maxSpeed := big.NewInt(41)
+				val, err := rand.Int(rand.Reader, maxSpeed)
+				if err == nil {
+					gob.Speed = int32(val.Int64()) + min
+				}
+			}
+		}
+	}(ctx)
+	go func() {
+		sdl.Delay(1500)
+		cancel()
+	}()
+
 }

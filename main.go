@@ -11,8 +11,8 @@ import (
 const (
 	FPS          uint32 = 60
 	DelayTime    uint32 = uint32(1000.0 / FPS)
-	WindowWidth         = 1280
-	WindowHeight        = 720
+	WindowWidth  int32  = 1280
+	WindowHeight int32  = 720
 	WindowTitle         = "Game"
 )
 
@@ -56,7 +56,8 @@ func main() {
 	defer rend.Destroy()
 
 	// Create player
-	player := gobject.NewGobject(rend, "assets/battleship.png", "player", WindowWidth/2, WindowHeight * 0.8)
+	player := gobject.NewGobject(rend, "assets/battleship.png", "player", WindowWidth/2-10, int32(float64(WindowHeight)*0.8), WindowWidth, WindowHeight)
+	ufo := gobject.NewGobject(rend, "assets/ufo.png", "player", WindowWidth/2-10, int32(10), WindowWidth, WindowHeight)
 	// Init gameObjects map
 	gameObjects = make(map[string]*gobject.Gobject)
 	gameObjects[player.Id] = player
@@ -80,11 +81,12 @@ func main() {
 		rend.Clear()
 
 		// Update
-		player.Update()
+		player.Update(rend)
 
 		// Render
 		player.Draw(rend)
-
+		ufo.Draw(rend)
+		ufo.RandomMoving(rend)
 		rend.Present()
 
 		// If too fast add delay
