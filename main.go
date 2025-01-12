@@ -24,7 +24,7 @@ var (
 	err       error
 	isRunning = true
 	// Maybe later
-	gameObjects map[string]*gobject.Gobject
+	players map[string]*gobject.Gobject
 )
 
 // Error checker
@@ -56,15 +56,18 @@ func main() {
 	defer rend.Destroy()
 
 	// Create player
-	player := gobject.NewGobject(rend, "assets/battleship.png", "player", WindowWidth/2-10, int32(float64(WindowHeight)*0.8), WindowWidth, WindowHeight)
-	ufo := gobject.NewGobject(rend, "assets/ufo.png", "player", WindowWidth/2-10, int32(10), WindowWidth, WindowHeight)
+	player := gobject.NewGobject(rend, "assets/battleship.png", "assets/exp.png", "player", WindowWidth/2-10, int32(float64(WindowHeight)*0.8), WindowWidth, WindowHeight, true)
+	ufo1 := gobject.NewGobject(rend, "assets/ufo.png", "assets/exp.png", "ufo1", WindowWidth/2-10, int32(10), WindowWidth, WindowHeight, true)
+	ufo2 := gobject.NewGobject(rend, "assets/ufo.png", "assets/exp.png", "ufo2", WindowWidth/2-200, int32(100), WindowWidth, WindowHeight, true)
 	// Init gameObjects map
-	gameObjects = make(map[string]*gobject.Gobject)
-	gameObjects[player.Id] = player
+	players = make(map[string]*gobject.Gobject)
+	players[player.Id] = player
+	enemies := make(map[string]*gobject.Gobject)
+	enemies[ufo1.Id] = ufo1
+	enemies[ufo2.Id] = ufo2
 
 	// Game loop
 	for isRunning {
-
 		frameStartTime := sdl.GetTicks()
 
 		// Handle event queue
@@ -80,13 +83,21 @@ func main() {
 		rend.SetDrawColor(0, 100, 155, 0)
 		rend.Clear()
 
-		// Update
-		player.Update(rend)
+		if player.IsMoving {
+			player.Draw(rend)
+			player.Update(rend, enemies)
+		} else {
+			player.Draw(rend)
+		}
 
-		// Render
-		player.Draw(rend)
-		ufo.Draw(rend)
-		ufo.RandomMoving(rend)
+		for _, val := range enemies {
+			if val.IsMoving {
+				val.Draw(rend)
+				val.RandomMoving(rend, player)
+			} else {
+				val.Draw(rend)
+			}
+		}
 		rend.Present()
 
 		// If too fast add delay
@@ -97,6 +108,9 @@ func main() {
 
 	} // End of isRunning
 
+	for _, val := range enemies {
+		val.Free()
+	}
 	player.Free()
 	sdl.Quit()
 }

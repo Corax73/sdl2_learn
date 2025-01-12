@@ -18,7 +18,7 @@ type GameObject interface {
 // Gobject represents game object
 type Gobject struct {
 	// Image filename
-	Filename string
+	Filename, FilenameDestruction string
 	// Key for mapping
 	Id string
 	// Position
@@ -29,6 +29,8 @@ type Gobject struct {
 	MaxX, MaxY, Width, Height int32
 	// Holds image
 	Texture *sdl.Texture
+	// Holds image
+	TextureDestruction *sdl.Texture
 	// Part of the spritesheet
 	Src sdl.Rect
 	// Part of the screen where to draw
@@ -39,8 +41,8 @@ type Gobject struct {
 }
 
 // NewGobject creates new game object
-func NewGobject(r *sdl.Renderer, file, id string, x, y, maxX, maxY int32) *Gobject {
-	gob := &Gobject{Filename: file, X: x, Y: y, MaxX: maxX, MaxY: maxY, Speed: 1}
+func NewGobject(r *sdl.Renderer, file, filenameDestruction, id string, x, y, maxX, maxY int32, isMoving bool) *Gobject {
+	gob := &Gobject{Filename: file, FilenameDestruction: filenameDestruction, Id: id, X: x, Y: y, MaxX: maxX, MaxY: maxY, Speed: 1, IsMoving: isMoving}
 	gob.Load(r)
 	return gob
 }
@@ -58,6 +60,18 @@ func (gob *Gobject) Load(r *sdl.Renderer) {
 		panic(err)
 	}
 
+	if gob.FilenameDestruction != "" {
+		imageDestruction, err := img.Load(gob.FilenameDestruction)
+		if err != nil {
+			panic(err)
+		}
+		defer imageDestruction.Free()
+		gob.TextureDestruction, err = r.CreateTextureFromSurface(imageDestruction)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	// Query image size and calculate frame width and height
 	_, _, imageWidth, imageHeight, _ := gob.Texture.Query()
 	gob.Width = imageWidth
@@ -70,22 +84,24 @@ func (gob *Gobject) Free() {
 }
 
 // Update updates object state
-func (gob *Gobject) Update(r *sdl.Renderer) {
-	keyStates := sdl.GetKeyboardState()
-	gob.Speed = 20
-	if keyStates[sdl.SCANCODE_LEFT] == 1 {
-		if (gob.X - gob.Speed) > 0 {
-			gob.X -= gob.Speed
+func (gob *Gobject) Update(r *sdl.Renderer, enemies map[string]*Gobject) {
+	if gob.IsMoving {
+		keyStates := sdl.GetKeyboardState()
+		gob.Speed = 20
+		if keyStates[sdl.SCANCODE_LEFT] == 1 {
+			if (gob.X - gob.Speed) > 0 {
+				gob.X -= gob.Speed
+			}
+			sdl.Delay(50)
+		} else if keyStates[sdl.SCANCODE_RIGHT] == 1 {
+			if (gob.X + gob.Speed + 70) < gob.MaxX {
+				gob.X += gob.Speed
+			}
+			sdl.Delay(50)
 		}
-		sdl.Delay(50)
-	} else if keyStates[sdl.SCANCODE_RIGHT] == 1 {
-		if (gob.X + gob.Speed + 70) < gob.MaxX {
-			gob.X += gob.Speed
+		if keyStates[sdl.SCANCODE_SPACE] == 1 {
+			gob.ShootUp(r, enemies)
 		}
-		sdl.Delay(50)
-	}
-	if keyStates[sdl.SCANCODE_SPACE] == 1 {
-		gob.ShootUp(r)
 	}
 }
 
@@ -102,73 +118,96 @@ func (gob *Gobject) Rect() sdl.Rect {
 // Draw object
 func (gob *Gobject) Draw(r *sdl.Renderer) {
 	dst := gob.Rect()
-	r.Copy(gob.Texture, nil, &dst)
+	if gob.IsMoving {
+		r.Copy(gob.Texture, nil, &dst)
+	} else {
+		r.Copy(gob.TextureDestruction, nil, &dst)
+	}
 }
 
-func (gob *Gobject) ShootUp(r *sdl.Renderer) {
+func (gob *Gobject) ShootUp(r *sdl.Renderer, enemies map[string]*Gobject) {
 	r.SetDrawColor(255, 255, 0, 255)
 	r.DrawLine(gob.X+50, gob.Y-5, gob.X+50, gob.Y-300)
+	for key, obj := range enemies {
+		if gob.X+50 >= obj.X && gob.X+50 <= obj.X+120 && obj.Y >= gob.Y-300 {
+			obj.IsMoving = false
+			obj.Destroy(r)
+			delete(enemies, key)
+		}
+	}
 }
 
-func (gob *Gobject) ShootDown(r *sdl.Renderer) {
-	r.SetDrawColor(0, 255, 0, 0)
-	r.DrawLine(gob.X+50, gob.Y-20, gob.X+50, gob.Y+300)
+func (gob *Gobject) ShootDown(r *sdl.Renderer, player *Gobject) {
+	if gob.IsMoving {
+		r.SetDrawColor(0, 255, 0, 0)
+		r.DrawLine(gob.X+50, gob.Y-20, gob.X+50, gob.Y+300)
+		if gob.X+50 >= player.X && gob.X+50 <= player.X+50 && player.Y <= gob.Y+300 {
+			player.IsMoving = false
+			player.Destroy(r)
+		}
+	}
 }
 
-func (gob *Gobject) RandomMoving(r *sdl.Renderer) {
+func (gob *Gobject) RandomMoving(r *sdl.Renderer, player *Gobject) {
 	ctx, cancel := context.WithCancel(context.Background())
-
 	go func(ctx context.Context) {
 		var min int32 = 20
 		gob.Speed = min
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			for i := 0; i < 2; i++ {
-				sdl.Delay(1500)
-				maxRand := big.NewInt(4)
-				if val, err := rand.Int(rand.Reader, maxRand); err == nil && val.Int64() > 2 {
-					gob.ShootDown(r)
-					sdl.Delay(1500)
-					if (gob.X - gob.Speed) > 0 {
-						gob.X -= gob.Speed
+		if gob.IsMoving {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				for i := 0; i < 2; i++ {
+					if gob.IsMoving {
 						sdl.Delay(1500)
+						maxRand := big.NewInt(4)
+						if val, err := rand.Int(rand.Reader, maxRand); err == nil && val.Int64() > 2 && gob.IsMoving {
+							gob.ShootDown(r, player)
+							sdl.Delay(1500)
+							if (gob.X-gob.Speed) > 0 && gob.IsMoving {
+								gob.X -= gob.Speed
+								sdl.Delay(1500)
+							}
+							if (gob.Y+gob.Speed+100) < gob.MaxY && gob.IsMoving {
+								gob.Y += gob.Speed
+								sdl.Delay(1500)
+							}
+							if (gob.X+gob.Speed+200) < gob.MaxX && gob.IsMoving {
+								gob.X += gob.Speed
+								sdl.Delay(1500)
+							}
+							if (gob.Y-gob.Speed) > 0 && gob.IsMoving {
+								gob.Y -= gob.Speed
+								sdl.Delay(1500)
+							}
+						} else {
+							sdl.Delay(1500)
+							if (gob.X+gob.Speed+200) < gob.MaxX && gob.IsMoving {
+								gob.X += gob.Speed
+								sdl.Delay(1500)
+							}
+							if (gob.Y-gob.Speed) > 0 && gob.IsMoving {
+								gob.Y -= gob.Speed
+								sdl.Delay(1500)
+							}
+							if (gob.X-gob.Speed) > 0 && gob.IsMoving {
+								gob.X -= gob.Speed
+								sdl.Delay(1500)
+							}
+							if (gob.Y+gob.Speed+100) < gob.MaxY && gob.IsMoving {
+								gob.Y += gob.Speed
+								sdl.Delay(1500)
+							}
+						}
+						maxSpeed := big.NewInt(41)
+						val, err := rand.Int(rand.Reader, maxSpeed)
+						if err == nil {
+							gob.Speed = int32(val.Int64()) + min
+						}
+					} else {
+						gob.Destroy(r)
 					}
-					if (gob.Y + gob.Speed + 100) < gob.MaxY {
-						gob.Y += gob.Speed
-						sdl.Delay(1500)
-					}
-					if (gob.X + gob.Speed + 200) < gob.MaxX {
-						gob.X += gob.Speed
-						sdl.Delay(1500)
-					}
-					if (gob.Y - gob.Speed) > 0 {
-						gob.Y -= gob.Speed
-						sdl.Delay(1500)
-					}
-				} else {
-					if (gob.X + gob.Speed + 200) < gob.MaxX {
-						gob.X += gob.Speed
-						sdl.Delay(1500)
-					}
-					if (gob.Y - gob.Speed) > 0 {
-						gob.Y -= gob.Speed
-						sdl.Delay(1500)
-					}
-					if (gob.X - gob.Speed) > 0 {
-						gob.X -= gob.Speed
-						sdl.Delay(1500)
-					}
-					if (gob.Y + gob.Speed + 100) < gob.MaxY {
-						gob.Y += gob.Speed
-						sdl.Delay(1500)
-					}
-				}
-				maxSpeed := big.NewInt(41)
-				val, err := rand.Int(rand.Reader, maxSpeed)
-				if err == nil {
-					gob.Speed = int32(val.Int64()) + min
 				}
 			}
 		}
@@ -177,5 +216,12 @@ func (gob *Gobject) RandomMoving(r *sdl.Renderer) {
 		sdl.Delay(1500)
 		cancel()
 	}()
+}
 
+func (gob *Gobject) Destroy(r *sdl.Renderer) {
+	if !gob.IsMoving {
+		dst := gob.Rect()
+		r.Copy(gob.TextureDestruction, nil, &dst)
+		gob.Free()
+	}
 }
