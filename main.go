@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sdl_learn/gobject"
+	"sdl_learn/inputs"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -23,6 +24,7 @@ var (
 	event     sdl.Event
 	err       error
 	isRunning = true
+	isExit    bool
 	// Maybe later
 	players map[string]*gobject.Gobject
 )
@@ -56,26 +58,95 @@ func main() {
 	defer rend.Destroy()
 
 	// Create player
-	player := gobject.NewGobject(rend, "assets/battleship.png", "assets/exp.png", "player", WindowWidth/2-10, int32(float64(WindowHeight)*0.8), WindowWidth, WindowHeight, true)
-	ufo1 := gobject.NewGobject(rend, "assets/ufo.png", "assets/exp.png", "ufo1", WindowWidth/2-10, int32(10), WindowWidth, WindowHeight, true)
-	ufo2 := gobject.NewGobject(rend, "assets/ufo.png", "assets/exp.png", "ufo2", WindowWidth/2-200, int32(100), WindowWidth, WindowHeight, true)
+	player := gobject.NewGobject(
+		rend,
+		"assets/battleship.png",
+		"assets/exp.png",
+		"player",
+		WindowWidth/2-10,
+		int32(float64(WindowHeight)*0.8),
+		WindowWidth,
+		WindowHeight,
+		true,
+	)
+	ufo1 := gobject.NewGobject(
+		rend,
+		"assets/ufo.png",
+		"assets/exp.png",
+		"ufo1",
+		WindowWidth/2-10,
+		int32(10),
+		WindowWidth,
+		WindowHeight,
+		true,
+	)
+	ufo2 := gobject.NewGobject(
+		rend,
+		"assets/ufo.png",
+		"assets/exp.png",
+		"ufo2",
+		WindowWidth/2-200,
+		int32(100),
+		WindowWidth,
+		WindowHeight,
+		true,
+	)
+	ufo3 := gobject.NewGobject(
+		rend,
+		"assets/ufo.png",
+		"assets/exp.png",
+		"ufo3",
+		WindowWidth/2+10,
+		int32(200),
+		WindowWidth,
+		WindowHeight,
+		true,
+	)
+	ufo4 := gobject.NewGobject(
+		rend,
+		"assets/ufo.png",
+		"assets/exp.png",
+		"ufo4",
+		WindowWidth/2+200,
+		int32(300),
+		WindowWidth,
+		WindowHeight,
+		true,
+	)
 	// Init gameObjects map
 	players = make(map[string]*gobject.Gobject)
 	players[player.Id] = player
 	enemies := make(map[string]*gobject.Gobject)
 	enemies[ufo1.Id] = ufo1
 	enemies[ufo2.Id] = ufo2
+	enemies[ufo3.Id] = ufo3
+	enemies[ufo4.Id] = ufo4
 
+	var left int32
+	var right int32
+	//chLeft := make(chan int)
+	//chRight := make(chan int)
+
+startGame:
 	// Game loop
 	for isRunning {
 		frameStartTime := sdl.GetTicks()
+
+		isRunning, isExit = inputs.Listen(isRunning)
+		fmt.Println(isRunning)
+		if !isRunning {
+			goto paused
+		}
+		//fmt.Println(isRunning)
 
 		// Handle event queue
 		for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch t := event.(type) {
 			case *sdl.QuitEvent:
 				fmt.Println(t)
+				isExit = true
 				isRunning = false
+				break
 			}
 		}
 
@@ -90,14 +161,58 @@ func main() {
 			player.Draw(rend)
 		}
 
-		for _, val := range enemies {
+		//fmt.Println("left=", left, "right=", right)
+		if left < WindowWidth/4 {
+			for _, val := range enemies {
+				if val.IsMoving && val.X > 100 {
+					val.Draw(rend)
+					val.LeftMoving(rend, player)
+					left++
+				} else {
+					val.Draw(rend)
+				}
+			}
+		} else if left >= WindowWidth/4 && right < WindowWidth-100 {
+			for _, val := range enemies {
+				if val.IsMoving && val.X < WindowWidth-100 {
+					val.Draw(rend)
+					val.RightMoving(rend, player)
+					right++
+				} else {
+					val.Draw(rend)
+				}
+			}
+		} else {
+			if right >= WindowWidth-100 && left >= WindowWidth/4 {
+				left, right = -WindowWidth, 0
+			}
+		}
+		/*for _, val := range enemies {
 			if val.IsMoving {
 				val.Draw(rend)
-				val.RandomMoving(rend, player)
+				//val.RandomMoving(rend, player)
+				fmt.Println("left=", left, "right=", right)
+				if left < 350 {
+					isLeft = true
+				}
+				if left <= 100 {
+					right = 0
+					isLeft = false
+				}
+				if right < 800 {
+					isRight = true
+				}
+				if isLeft {
+					val.LeftMoving(rend, player)
+					left++
+				} else if isRight {
+					val.RightMoving(rend, player)
+					right++
+				}
 			} else {
 				val.Draw(rend)
 			}
-		}
+		}*/
 		rend.Present()
 
 		// If too fast add delay
@@ -108,9 +223,34 @@ func main() {
 
 	} // End of isRunning
 
-	for _, val := range enemies {
-		val.Free()
+paused:
+	fmt.Println(isRunning)
+	fmt.Println(isExit)
+	for !isExit {
+		isRunning, isExit = inputs.Listen(isRunning)
+		/*fmt.Println(isRunning)
+		for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+			switch t := event.(type) {
+			case *sdl.QuitEvent:
+				fmt.Println(t)
+				isExit = true
+				isRunning = false
+				break
+			}
+		}
+		fmt.Println(isExit)*/
+		if isExit {
+			break
+		}
+		if isRunning {
+			goto startGame
+		}
 	}
-	player.Free()
-	sdl.Quit()
+	if isExit {
+		for _, val := range enemies {
+			val.Free()
+		}
+		player.Free()
+		sdl.Quit()
+	}
 }

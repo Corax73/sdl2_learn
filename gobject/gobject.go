@@ -126,10 +126,29 @@ func (gob *Gobject) Draw(r *sdl.Renderer) {
 }
 
 func (gob *Gobject) ShootUp(r *sdl.Renderer, enemies map[string]*Gobject) {
+	bullet := gob.GetBulletRect()
 	r.SetDrawColor(255, 255, 0, 255)
-	r.DrawLine(gob.X+50, gob.Y-5, gob.X+50, gob.Y-300)
+	sdl.Delay(50)
+	r.FillRect(&bullet)
+	//r.Present()
+	bullet.Y -= 100
+	r.SetDrawColor(255, 255, 0, 255)
+	/*for i := int32(1); i < 5; i++ {
+		start := gob.Y - 5*i
+		end := gob.Y - 100*i
+		if i > 1 {
+			start -= 150
+			end -= 150
+		}
+		r.DrawLine(gob.X+50, start, gob.X+50, end)
+		sdl.Delay(10)
+	}*/
+	/*r.DrawLine(gob.X+50, gob.Y-5, gob.X+50, gob.Y-100)
+	r.DrawLine(gob.X+50, gob.Y-150, gob.X+50, gob.Y-250)
+	r.DrawLine(gob.X+50, gob.Y-300, gob.X+50, gob.Y-450)
+	r.DrawLine(gob.X+50, gob.Y-500, gob.X+50, gob.Y-600)*/
 	for key, obj := range enemies {
-		if gob.X+50 >= obj.X && gob.X+50 <= obj.X+120 && obj.Y >= gob.Y-300 {
+		if gob.X+50 >= obj.X && gob.X+50 <= obj.X+120 && obj.Y >= gob.Y-600 {
 			obj.IsMoving = false
 			obj.Destroy(r)
 			delete(enemies, key)
@@ -140,8 +159,8 @@ func (gob *Gobject) ShootUp(r *sdl.Renderer, enemies map[string]*Gobject) {
 func (gob *Gobject) ShootDown(r *sdl.Renderer, player *Gobject) {
 	if gob.IsMoving {
 		r.SetDrawColor(0, 255, 0, 0)
-		r.DrawLine(gob.X+50, gob.Y-20, gob.X+50, gob.Y+300)
-		if gob.X+50 >= player.X && gob.X+50 <= player.X+50 && player.Y <= gob.Y+300 {
+		r.DrawLine(gob.X+60, gob.Y+100, gob.X+60, gob.Y+300)
+		if gob.X+60 >= player.X && gob.X+60 <= player.X+50 && player.Y <= gob.Y+300 {
 			player.IsMoving = false
 			player.Destroy(r)
 		}
@@ -223,5 +242,81 @@ func (gob *Gobject) Destroy(r *sdl.Renderer) {
 		dst := gob.Rect()
 		r.Copy(gob.TextureDestruction, nil, &dst)
 		gob.Free()
+	}
+}
+
+func (gob *Gobject) LeftMoving(r *sdl.Renderer, player *Gobject) {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func(ctx context.Context) {
+		gob.Speed = 2
+		if gob.IsMoving {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if gob.IsMoving {
+					sdl.Delay(1500)
+					maxRand := big.NewInt(4)
+					val, err := rand.Int(rand.Reader, maxRand)
+					if err == nil && val.Int64() > 2 {
+						gob.ShootDown(r, player)
+					}
+					sdl.Delay(1500)
+					if (gob.X-gob.Speed) > 100 && gob.IsMoving {
+						gob.X -= gob.Speed
+						sdl.Delay(1500)
+					}
+				} else {
+					gob.Destroy(r)
+				}
+			}
+		}
+	}(ctx)
+	go func() {
+		sdl.Delay(1500)
+		cancel()
+	}()
+}
+
+func (gob *Gobject) RightMoving(r *sdl.Renderer, player *Gobject) {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func(ctx context.Context) {
+		gob.Speed = 2
+		if gob.IsMoving {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if gob.IsMoving {
+					sdl.Delay(1500)
+					maxRand := big.NewInt(4)
+					val, err := rand.Int(rand.Reader, maxRand)
+					if err == nil && val.Int64() > 2 {
+						gob.ShootDown(r, player)
+					}
+					sdl.Delay(1500)
+					if (gob.X+gob.Speed) < 1100 && gob.IsMoving {
+						gob.X += gob.Speed
+						sdl.Delay(1500)
+					}
+				} else {
+					gob.Destroy(r)
+				}
+			}
+		}
+	}(ctx)
+	go func() {
+		sdl.Delay(1500)
+		cancel()
+	}()
+}
+
+func (gob *Gobject) GetBulletRect() sdl.Rect {
+	x, y := gob.X+45, gob.Y-30
+	return sdl.Rect{
+		X: x,
+		Y: y,
+		W: 5,
+		H: 15,
 	}
 }
