@@ -18,7 +18,7 @@ type GameObject interface {
 // Gobject represents game object
 type Gobject struct {
 	// Image filename
-	Filename, FilenameDestruction string
+	Filename, FilenameDestruction, FilenameBullet string
 	// Key for mapping
 	Id string
 	// Position
@@ -31,18 +31,32 @@ type Gobject struct {
 	Texture *sdl.Texture
 	// Holds image
 	TextureDestruction *sdl.Texture
+	// Holds image
+	TextureBullet *sdl.Texture
 	// Part of the spritesheet
 	Src sdl.Rect
 	// Part of the screen where to draw
 	Dest sdl.Rect
 	// Is object moving
 	IsMoving  bool
+	IsShoot   bool
 	Direction sdl.FPoint
 }
 
 // NewGobject creates new game object
-func NewGobject(r *sdl.Renderer, file, filenameDestruction, id string, x, y, maxX, maxY int32, isMoving bool) *Gobject {
-	gob := &Gobject{Filename: file, FilenameDestruction: filenameDestruction, Id: id, X: x, Y: y, MaxX: maxX, MaxY: maxY, Speed: 1, IsMoving: isMoving}
+func NewGobject(r *sdl.Renderer, file, filenameDestruction, filenameBullet, id string, x, y, maxX, maxY int32, isMoving bool) *Gobject {
+	gob := &Gobject{
+		Filename:            file,
+		FilenameDestruction: filenameDestruction,
+		FilenameBullet:      filenameBullet,
+		Id:                  id,
+		X:                   x,
+		Y:                   y,
+		MaxX:                maxX,
+		MaxY:                maxY,
+		Speed:               1,
+		IsMoving:            isMoving,
+	}
 	gob.Load(r)
 	return gob
 }
@@ -72,6 +86,18 @@ func (gob *Gobject) Load(r *sdl.Renderer) {
 		}
 	}
 
+	if gob.FilenameBullet != "" {
+		imageBullet, err := img.Load(gob.FilenameBullet)
+		if err != nil {
+			panic(err)
+		}
+		defer imageBullet.Free()
+		gob.TextureBullet, err = r.CreateTextureFromSurface(imageBullet)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	// Query image size and calculate frame width and height
 	_, _, imageWidth, imageHeight, _ := gob.Texture.Query()
 	gob.Width = imageWidth
@@ -84,7 +110,7 @@ func (gob *Gobject) Free() {
 }
 
 // Update updates object state
-func (gob *Gobject) Update(r *sdl.Renderer, enemies map[string]*Gobject) {
+func (gob *Gobject) Update(r *sdl.Renderer) {
 	if gob.IsMoving {
 		keyStates := sdl.GetKeyboardState()
 		gob.Speed = 20
@@ -100,7 +126,7 @@ func (gob *Gobject) Update(r *sdl.Renderer, enemies map[string]*Gobject) {
 			sdl.Delay(50)
 		}
 		if keyStates[sdl.SCANCODE_SPACE] == 1 {
-			gob.ShootUp(r, enemies)
+			gob.IsShoot = true
 		}
 	}
 }
@@ -122,37 +148,6 @@ func (gob *Gobject) Draw(r *sdl.Renderer) {
 		r.Copy(gob.Texture, nil, &dst)
 	} else {
 		r.Copy(gob.TextureDestruction, nil, &dst)
-	}
-}
-
-func (gob *Gobject) ShootUp(r *sdl.Renderer, enemies map[string]*Gobject) {
-	bullet := gob.GetBulletRect()
-	r.SetDrawColor(255, 255, 0, 255)
-	sdl.Delay(50)
-	r.FillRect(&bullet)
-	//r.Present()
-	bullet.Y -= 100
-	r.SetDrawColor(255, 255, 0, 255)
-	/*for i := int32(1); i < 5; i++ {
-		start := gob.Y - 5*i
-		end := gob.Y - 100*i
-		if i > 1 {
-			start -= 150
-			end -= 150
-		}
-		r.DrawLine(gob.X+50, start, gob.X+50, end)
-		sdl.Delay(10)
-	}*/
-	/*r.DrawLine(gob.X+50, gob.Y-5, gob.X+50, gob.Y-100)
-	r.DrawLine(gob.X+50, gob.Y-150, gob.X+50, gob.Y-250)
-	r.DrawLine(gob.X+50, gob.Y-300, gob.X+50, gob.Y-450)
-	r.DrawLine(gob.X+50, gob.Y-500, gob.X+50, gob.Y-600)*/
-	for key, obj := range enemies {
-		if gob.X+50 >= obj.X && gob.X+50 <= obj.X+120 && obj.Y >= gob.Y-600 {
-			obj.IsMoving = false
-			obj.Destroy(r)
-			delete(enemies, key)
-		}
 	}
 }
 
@@ -311,12 +306,38 @@ func (gob *Gobject) RightMoving(r *sdl.Renderer, player *Gobject) {
 	}()
 }
 
-func (gob *Gobject) GetBulletRect() sdl.Rect {
-	x, y := gob.X+45, gob.Y-30
+func (gob *Gobject) GetBulletRect(startX, startY int32) sdl.Rect {
+	x, y := startX+32, startY-35
+	_, _, imageWidth, imageHeight, _ := gob.TextureBullet.Query()
 	return sdl.Rect{
 		X: x,
 		Y: y,
-		W: 5,
-		H: 15,
+		W: imageWidth,
+		H: imageHeight,
 	}
+}
+
+func (gob *Gobject) UpMoving(r *sdl.Renderer) {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func(ctx context.Context) {
+		gob.Speed = 2
+		if gob.IsMoving {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if gob.IsMoving {
+					sdl.Delay(500)
+					if (gob.Y-gob.Speed*10) >= 100 && gob.IsMoving {
+						gob.Y -= gob.Speed * 10
+						sdl.Delay(500)
+					}
+				}
+			}
+		}
+	}(ctx)
+	go func() {
+		sdl.Delay(500)
+		cancel()
+	}()
 }

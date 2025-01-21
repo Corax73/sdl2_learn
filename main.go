@@ -62,6 +62,7 @@ func main() {
 		rend,
 		"assets/battleship.png",
 		"assets/exp.png",
+		"assets/bullet.png",
 		"player",
 		WindowWidth/2-10,
 		int32(float64(WindowHeight)*0.8),
@@ -73,6 +74,7 @@ func main() {
 		rend,
 		"assets/ufo.png",
 		"assets/exp.png",
+		"",
 		"ufo1",
 		WindowWidth/2-10,
 		int32(10),
@@ -84,6 +86,7 @@ func main() {
 		rend,
 		"assets/ufo.png",
 		"assets/exp.png",
+		"",
 		"ufo2",
 		WindowWidth/2-200,
 		int32(100),
@@ -95,6 +98,7 @@ func main() {
 		rend,
 		"assets/ufo.png",
 		"assets/exp.png",
+		"",
 		"ufo3",
 		WindowWidth/2+10,
 		int32(200),
@@ -106,7 +110,21 @@ func main() {
 		rend,
 		"assets/ufo.png",
 		"assets/exp.png",
+		"",
 		"ufo4",
+		WindowWidth/2+200,
+		int32(300),
+		WindowWidth,
+		WindowHeight,
+		true,
+	)
+
+	bullet := gobject.NewGobject(
+		rend,
+		"assets/bullet.png",
+		"",
+		"",
+		"bullet",
 		WindowWidth/2+200,
 		int32(300),
 		WindowWidth,
@@ -122,10 +140,10 @@ func main() {
 	enemies[ufo3.Id] = ufo3
 	enemies[ufo4.Id] = ufo4
 
+	manager := gobject.NewManager(player, bullet, rend, enemies)
+
 	var left int32
 	var right int32
-	//chLeft := make(chan int)
-	//chRight := make(chan int)
 
 startGame:
 	// Game loop
@@ -133,11 +151,9 @@ startGame:
 		frameStartTime := sdl.GetTicks()
 
 		isRunning, isExit = inputs.Listen(isRunning)
-		fmt.Println(isRunning)
 		if !isRunning {
 			goto paused
 		}
-		//fmt.Println(isRunning)
 
 		// Handle event queue
 		for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
@@ -156,12 +172,13 @@ startGame:
 
 		if player.IsMoving {
 			player.Draw(rend)
-			player.Update(rend, enemies)
+			player.Update(rend)
+			manager.ScanShoot()
+			bullet.Draw(rend)
 		} else {
 			player.Draw(rend)
 		}
 
-		//fmt.Println("left=", left, "right=", right)
 		if left < WindowWidth/4 {
 			for _, val := range enemies {
 				if val.IsMoving && val.X > 100 {
@@ -187,32 +204,6 @@ startGame:
 				left, right = -WindowWidth, 0
 			}
 		}
-		/*for _, val := range enemies {
-			if val.IsMoving {
-				val.Draw(rend)
-				//val.RandomMoving(rend, player)
-				fmt.Println("left=", left, "right=", right)
-				if left < 350 {
-					isLeft = true
-				}
-				if left <= 100 {
-					right = 0
-					isLeft = false
-				}
-				if right < 800 {
-					isRight = true
-				}
-				if isLeft {
-					val.LeftMoving(rend, player)
-					left++
-				} else if isRight {
-					val.RightMoving(rend, player)
-					right++
-				}
-			} else {
-				val.Draw(rend)
-			}
-		}*/
 		rend.Present()
 
 		// If too fast add delay
@@ -224,21 +215,8 @@ startGame:
 	} // End of isRunning
 
 paused:
-	fmt.Println(isRunning)
-	fmt.Println(isExit)
 	for !isExit {
 		isRunning, isExit = inputs.Listen(isRunning)
-		/*fmt.Println(isRunning)
-		for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-			switch t := event.(type) {
-			case *sdl.QuitEvent:
-				fmt.Println(t)
-				isExit = true
-				isRunning = false
-				break
-			}
-		}
-		fmt.Println(isExit)*/
 		if isExit {
 			break
 		}
