@@ -6,6 +6,7 @@ import (
 	"sdl_learn/inputs"
 
 	"github.com/veandco/go-sdl2/sdl"
+	"github.com/veandco/go-sdl2/ttf"
 )
 
 // Global consts
@@ -223,6 +224,7 @@ paused:
 		if isRunning {
 			goto startGame
 		}
+		drawText(win, "Pause")
 	}
 	if isExit {
 		for _, val := range enemies {
@@ -230,5 +232,41 @@ paused:
 		}
 		player.Free()
 		sdl.Quit()
+	}
+}
+
+func drawText(win *sdl.Window, drawingText string) {
+	if drawingText != "" {
+		var font *ttf.Font
+		var surface *sdl.Surface
+		var text *sdl.Surface
+
+		if err = ttf.Init(); err != nil {
+			return
+		}
+
+		if surface, err = win.GetSurface(); err != nil {
+			return
+		}
+
+		// Load the font for our text
+		if font, err = ttf.OpenFont("assets/test.ttf", 48); err != nil {
+			return
+		}
+		defer font.Close()
+
+		// Create a red text with the font
+		if text, err = font.RenderUTF8Blended(drawingText, sdl.Color{R: 155, G: 0, B: 100, A: 255}); err != nil {
+			return
+		}
+		defer text.Free()
+
+		// Draw the text around the center of the window
+		if err = text.Blit(nil, surface, &sdl.Rect{X: WindowWidth/2 - 50, Y: WindowHeight/2 - 50, W: 0, H: 0}); err != nil {
+			return
+		}
+
+		// Update the window surface with what we have drawn
+		win.UpdateSurface()
 	}
 }

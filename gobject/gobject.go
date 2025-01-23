@@ -3,6 +3,7 @@ package gobject
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"math/big"
 
 	"github.com/veandco/go-sdl2/img"
@@ -317,10 +318,10 @@ func (gob *Gobject) GetBulletRect(startX, startY int32) sdl.Rect {
 	}
 }
 
-func (gob *Gobject) UpMoving(r *sdl.Renderer) {
+func (gob *Gobject) UpMoving(r *sdl.Renderer, objects map[string]*Gobject) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func(ctx context.Context) {
-		gob.Speed = 2
+		gob.Speed = 1
 		if gob.IsMoving {
 			select {
 			case <-ctx.Done():
@@ -329,9 +330,20 @@ func (gob *Gobject) UpMoving(r *sdl.Renderer) {
 				if gob.IsMoving {
 					sdl.Delay(500)
 					if (gob.Y-gob.Speed*10) >= 100 && gob.IsMoving {
-						gob.Y -= gob.Speed * 10
+						gob.Y -= gob.Speed * 100
+						gob.Draw(r)
+						for key, obj := range objects {
+							fmt.Println("objX=", obj.X, "objY=", obj.Y)
+							fmt.Println("gobX=", gob.X, "gobY=", gob.Y)
+							if gob.X+50 >= obj.X && gob.X+50 <= obj.X+120 && obj.Y <= gob.Y-50 || obj.Y-100 >= gob.Y {
+								obj.IsMoving = false
+								obj.Destroy(r)
+								fmt.Println(1)
+								delete(objects, key)
+							}
+						}
 						sdl.Delay(500)
-					}
+					}				
 				}
 			}
 		}
