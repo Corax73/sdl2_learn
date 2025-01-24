@@ -26,7 +26,8 @@ func (manager *Manager) MovingBullet(startX, startY, distance int32) {
 	manager.BulletObj.Draw(manager.r)
 	for i := int32(1); i*100 <= distance; i++ {
 		manager.BulletObj.UpMoving(manager.r, manager.enemies)
-		sdl.Delay(10)
+		manager.BulletObj.Draw(manager.r)
+		sdl.Delay(16)
 	}
 }
 

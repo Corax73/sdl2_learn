@@ -3,7 +3,6 @@ package gobject
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	"math/big"
 
 	"github.com/veandco/go-sdl2/img"
@@ -42,6 +41,7 @@ type Gobject struct {
 	IsMoving  bool
 	IsShoot   bool
 	Direction sdl.FPoint
+	Score int
 }
 
 // NewGobject creates new game object
@@ -134,11 +134,12 @@ func (gob *Gobject) Update(r *sdl.Renderer) {
 
 func (gob *Gobject) Rect() sdl.Rect {
 	x, y := int32(gob.X), int32(gob.Y)
+	_, _, imageWidth, imageHeight, _ := gob.Texture.Query()
 	return sdl.Rect{
 		X: x,
 		Y: y,
-		W: gob.Width,
-		H: gob.Height,
+		W: imageWidth,
+		H: imageHeight,
 	}
 }
 
@@ -237,6 +238,7 @@ func (gob *Gobject) Destroy(r *sdl.Renderer) {
 	if !gob.IsMoving {
 		dst := gob.Rect()
 		r.Copy(gob.TextureDestruction, nil, &dst)
+		sdl.Delay(500)
 		gob.Free()
 	}
 }
@@ -333,17 +335,18 @@ func (gob *Gobject) UpMoving(r *sdl.Renderer, objects map[string]*Gobject) {
 						gob.Y -= gob.Speed * 100
 						gob.Draw(r)
 						for key, obj := range objects {
-							fmt.Println("objX=", obj.X, "objY=", obj.Y)
-							fmt.Println("gobX=", gob.X, "gobY=", gob.Y)
-							if gob.X+50 >= obj.X && gob.X+50 <= obj.X+120 && obj.Y <= gob.Y-50 || obj.Y-100 >= gob.Y {
+							if !(gob.X >= obj.X+obj.Rect().W ||
+								gob.X+gob.Rect().W <= obj.X ||
+								gob.Y >= obj.Y+obj.Rect().H ||
+								gob.Y+gob.Rect().H <= obj.Y) {
 								obj.IsMoving = false
 								obj.Destroy(r)
-								fmt.Println(1)
+								gob.Score += 100
 								delete(objects, key)
 							}
 						}
 						sdl.Delay(500)
-					}				
+					}
 				}
 			}
 		}

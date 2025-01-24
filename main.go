@@ -132,6 +132,7 @@ func main() {
 		WindowHeight,
 		true,
 	)
+
 	// Init gameObjects map
 	players = make(map[string]*gobject.Gobject)
 	players[player.Id] = player
@@ -175,7 +176,6 @@ startGame:
 			player.Draw(rend)
 			player.Update(rend)
 			manager.ScanShoot()
-			bullet.Draw(rend)
 		} else {
 			player.Draw(rend)
 		}
@@ -224,7 +224,7 @@ paused:
 		if isRunning {
 			goto startGame
 		}
-		drawText(win, "Pause")
+		drawText(win, "Pause", rend)
 	}
 	if isExit {
 		for _, val := range enemies {
@@ -235,19 +235,23 @@ paused:
 	}
 }
 
-func drawText(win *sdl.Window, drawingText string) {
+func drawText(win *sdl.Window, drawingText string, rend *sdl.Renderer) {
 	if drawingText != "" {
 		var font *ttf.Font
-		var surface *sdl.Surface
+		//var surface *sdl.Surface
 		var text *sdl.Surface
 
+		var textRect sdl.Rect
+		var textImage *sdl.Texture
+		textRect.X = WindowWidth/2
+		textRect.Y = WindowHeight/2
 		if err = ttf.Init(); err != nil {
 			return
 		}
 
-		if surface, err = win.GetSurface(); err != nil {
+		/*if surface, err = win.GetSurface(); err != nil {
 			return
-		}
+		}*/
 
 		// Load the font for our text
 		if font, err = ttf.OpenFont("assets/test.ttf", 48); err != nil {
@@ -255,16 +259,25 @@ func drawText(win *sdl.Window, drawingText string) {
 		}
 		defer font.Close()
 
-		// Create a red text with the font
+		// Create text with the font
 		if text, err = font.RenderUTF8Blended(drawingText, sdl.Color{R: 155, G: 0, B: 100, A: 255}); err != nil {
 			return
 		}
 		defer text.Free()
 
-		// Draw the text around the center of the window
-		if err = text.Blit(nil, surface, &sdl.Rect{X: WindowWidth/2 - 50, Y: WindowHeight/2 - 50, W: 0, H: 0}); err != nil {
-			return
+		textRect.W = text.W
+		textRect.H = text.H
+
+		if textImage, err = rend.CreateTextureFromSurface(text); err != nil {
+			fmt.Println(err)
 		}
+
+		rend.Copy(textImage, nil, &textRect)
+		fmt.Println(textImage)
+		// Draw the text around the center of the window
+		/*if err = text.Blit(nil, surface, &sdl.Rect{X: WindowWidth/2 - 50, Y: WindowHeight/2 - 50, W: 0, H: 0}); err != nil {
+			return
+		}*/
 
 		// Update the window surface with what we have drawn
 		win.UpdateSurface()
