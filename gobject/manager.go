@@ -23,7 +23,6 @@ func NewManager(player *Gobject, bullet *Gobject, r *sdl.Renderer, enemies map[s
 func (manager *Manager) MovingBullet(startX, startY, distance int32) {
 	manager.BulletObj.X = startX + 32
 	manager.BulletObj.Y = startY - 35
-	manager.BulletObj.Draw(manager.r)
 	for i := int32(1); i*100 <= distance; i++ {
 		manager.BulletObj.UpMoving(manager.r, manager.enemies)
 		manager.BulletObj.Draw(manager.r)
@@ -41,9 +40,11 @@ func (manager *Manager) ShootUp(startX, startY, distance int32) {
 	}
 }
 
-func (manager *Manager) ScanShoot() {
+func (manager *Manager) ScanShoot() bool {
 	if manager.PlayerObj.IsShoot {
 		manager.MovingBullet(manager.PlayerObj.X, manager.PlayerObj.Y, int32(900))
 		manager.PlayerObj.IsShoot = false
+		return true
 	}
+	return false
 }

@@ -38,10 +38,10 @@ type Gobject struct {
 	// Part of the screen where to draw
 	Dest sdl.Rect
 	// Is object moving
-	IsMoving  bool
-	IsShoot   bool
-	Direction sdl.FPoint
-	Score int
+	IsMoving          bool
+	IsShoot           bool
+	Direction         sdl.FPoint
+	Score, ShootDelay int
 }
 
 // NewGobject creates new game object
@@ -127,7 +127,12 @@ func (gob *Gobject) Update(r *sdl.Renderer) {
 			sdl.Delay(50)
 		}
 		if keyStates[sdl.SCANCODE_SPACE] == 1 {
-			gob.IsShoot = true
+			if gob.ShootDelay == 0 {
+				gob.IsShoot = true
+				gob.ShootDelay = 3
+			} else {
+				gob.ShootDelay -= 1
+			}
 		}
 	}
 }
@@ -330,10 +335,9 @@ func (gob *Gobject) UpMoving(r *sdl.Renderer, objects map[string]*Gobject) {
 				return
 			default:
 				if gob.IsMoving {
-					sdl.Delay(500)
+					sdl.Delay(50)
 					if (gob.Y-gob.Speed*10) >= 100 && gob.IsMoving {
 						gob.Y -= gob.Speed * 100
-						gob.Draw(r)
 						for key, obj := range objects {
 							if !(gob.X >= obj.X+obj.Rect().W ||
 								gob.X+gob.Rect().W <= obj.X ||
@@ -345,7 +349,7 @@ func (gob *Gobject) UpMoving(r *sdl.Renderer, objects map[string]*Gobject) {
 								delete(objects, key)
 							}
 						}
-						sdl.Delay(500)
+						sdl.Delay(50)
 					}
 				}
 			}

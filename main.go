@@ -6,7 +6,6 @@ import (
 	"sdl_learn/inputs"
 
 	"github.com/veandco/go-sdl2/sdl"
-	"github.com/veandco/go-sdl2/ttf"
 )
 
 // Global consts
@@ -147,6 +146,8 @@ func main() {
 	var left int32
 	var right int32
 
+	var shot bool
+
 startGame:
 	// Game loop
 	for isRunning {
@@ -175,9 +176,13 @@ startGame:
 		if player.IsMoving {
 			player.Draw(rend)
 			player.Update(rend)
-			manager.ScanShoot()
+			shot = manager.ScanShoot()
 		} else {
 			player.Draw(rend)
+		}
+
+		if shot {
+			bullet.Draw(rend)
 		}
 
 		if left < WindowWidth/4 {
@@ -224,7 +229,7 @@ paused:
 		if isRunning {
 			goto startGame
 		}
-		drawText(win, "Pause", rend)
+		isRunning = drawText()
 	}
 	if isExit {
 		for _, val := range enemies {
@@ -235,51 +240,34 @@ paused:
 	}
 }
 
-func drawText(win *sdl.Window, drawingText string, rend *sdl.Renderer) {
-	if drawingText != "" {
-		var font *ttf.Font
-		//var surface *sdl.Surface
-		var text *sdl.Surface
-
-		var textRect sdl.Rect
-		var textImage *sdl.Texture
-		textRect.X = WindowWidth/2
-		textRect.Y = WindowHeight/2
-		if err = ttf.Init(); err != nil {
-			return
-		}
-
-		/*if surface, err = win.GetSurface(); err != nil {
-			return
-		}*/
-
-		// Load the font for our text
-		if font, err = ttf.OpenFont("assets/test.ttf", 48); err != nil {
-			return
-		}
-		defer font.Close()
-
-		// Create text with the font
-		if text, err = font.RenderUTF8Blended(drawingText, sdl.Color{R: 155, G: 0, B: 100, A: 255}); err != nil {
-			return
-		}
-		defer text.Free()
-
-		textRect.W = text.W
-		textRect.H = text.H
-
-		if textImage, err = rend.CreateTextureFromSurface(text); err != nil {
-			fmt.Println(err)
-		}
-
-		rend.Copy(textImage, nil, &textRect)
-		fmt.Println(textImage)
-		// Draw the text around the center of the window
-		/*if err = text.Blit(nil, surface, &sdl.Rect{X: WindowWidth/2 - 50, Y: WindowHeight/2 - 50, W: 0, H: 0}); err != nil {
-			return
-		}*/
-
-		// Update the window surface with what we have drawn
-		win.UpdateSurface()
+func drawText() bool {
+	buttons := []sdl.MessageBoxButtonData{
+		{Flags: sdl.MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, ButtonID: 0, Text: "cancel PAUSE"},
 	}
+
+	colorScheme := sdl.MessageBoxColorScheme{
+		Colors: [5]sdl.MessageBoxColor{
+			sdl.MessageBoxColor{R: 255, G: 0, B: 0},
+			sdl.MessageBoxColor{R: 0, G: 255, B: 0},
+			sdl.MessageBoxColor{R: 255, G: 255, B: 0},
+			sdl.MessageBoxColor{R: 0, G: 0, B: 255},
+			sdl.MessageBoxColor{R: 255, G: 0, B: 255},
+		},
+	}
+
+	messageboxdata := sdl.MessageBoxData{
+		Flags:       sdl.MESSAGEBOX_INFORMATION,
+		Window:      nil,
+		Title:       "PAUSED",
+		Message:     "",
+		Buttons:     buttons,
+		ColorScheme: &colorScheme,
+	}
+
+	buttonid, _ := sdl.ShowMessageBox(&messageboxdata)
+
+	if buttonid == 1 {
+		return false
+	}
+	return true
 }
