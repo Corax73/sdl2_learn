@@ -325,7 +325,7 @@ func (gob *Gobject) GetBulletRect(startX, startY int32) sdl.Rect {
 	}
 }
 
-func (gob *Gobject) UpMoving(r *sdl.Renderer, objects map[string]*Gobject) {
+func (gob *Gobject) UpMoving(r *sdl.Renderer, objects map[string]*Gobject, bullets map[string]*Gobject, player *Gobject) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func(ctx context.Context) {
 		gob.Speed = 1
@@ -334,23 +334,22 @@ func (gob *Gobject) UpMoving(r *sdl.Renderer, objects map[string]*Gobject) {
 			case <-ctx.Done():
 				return
 			default:
-				if gob.IsMoving {
-					sdl.Delay(50)
-					if (gob.Y-gob.Speed*10) >= 100 && gob.IsMoving {
-						gob.Y -= gob.Speed * 100
-						for key, obj := range objects {
-							if !(gob.X >= obj.X+obj.Rect().W ||
-								gob.X+gob.Rect().W <= obj.X ||
-								gob.Y >= obj.Y+obj.Rect().H ||
-								gob.Y+gob.Rect().H <= obj.Y) {
-								obj.IsMoving = false
-								obj.Destroy(r)
-								gob.Score += 100
-								delete(objects, key)
-							}
+				if gob.Y > 0 && gob.IsMoving {
+					sdl.Delay(100)
+					gob.Y -= gob.Speed * 70
+					for key, obj := range objects {
+						if gob.IsMoving && !(gob.X >= obj.X+obj.Rect().W ||
+							gob.X+gob.Rect().W <= obj.X ||
+							gob.Y >= obj.Y+obj.Rect().H ||
+							gob.Y+gob.Rect().H <= obj.Y) {
+							obj.IsMoving = false
+							gob.IsMoving = false
+							obj.Destroy(r)
+							player.Score += 100
+							delete(objects, key)
 						}
-						sdl.Delay(50)
 					}
+					sdl.Delay(100)
 				}
 			}
 		}

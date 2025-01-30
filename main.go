@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sdl_learn/gobject"
 	"sdl_learn/inputs"
+	"strconv"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -26,7 +27,8 @@ var (
 	isRunning = true
 	isExit    bool
 	// Maybe later
-	players map[string]*gobject.Gobject
+	players, enemies, bullets map[string]*gobject.Gobject
+	BulletId                  int
 )
 
 // Error checker
@@ -119,19 +121,6 @@ func main() {
 		true,
 	)
 
-	bullet := gobject.NewGobject(
-		rend,
-		"assets/bullet.png",
-		"",
-		"",
-		"bullet",
-		WindowWidth/2+200,
-		int32(300),
-		WindowWidth,
-		WindowHeight,
-		true,
-	)
-
 	// Init gameObjects map
 	players = make(map[string]*gobject.Gobject)
 	players[player.Id] = player
@@ -141,11 +130,12 @@ func main() {
 	enemies[ufo3.Id] = ufo3
 	enemies[ufo4.Id] = ufo4
 
-	manager := gobject.NewManager(player, bullet, rend, enemies)
+	bullets := make(map[string]*gobject.Gobject)
+
+	manager := gobject.NewManager(player, rend, enemies, bullets)
 
 	var left int32
 	var right int32
-
 	var shot bool
 
 startGame:
@@ -182,7 +172,8 @@ startGame:
 		}
 
 		if shot {
-			bullet.Draw(rend)
+			bullet := NewBullet(rend, player.X, player.Y)
+			manager.Bullets[bullet.Id] = bullet
 		}
 
 		if left < WindowWidth/4 {
@@ -208,6 +199,17 @@ startGame:
 		} else {
 			if right >= WindowWidth-100 && left >= WindowWidth/4 {
 				left, right = -WindowWidth, 0
+			}
+		}
+
+		for key, val := range manager.Bullets {
+			if val.Y > 0 && val.IsMoving {
+				val.UpMoving(manager.R, manager.Enemies, manager.Bullets, manager.PlayerObj)
+				val.Draw(rend)
+			} else if val.Y <= 0 || !val.IsMoving {
+				val.Draw(rend)
+				val.Free()
+				delete(manager.Bullets, key)
 			}
 		}
 		rend.Present()
@@ -270,4 +272,21 @@ func drawText() bool {
 		return false
 	}
 	return true
+}
+
+func NewBullet(r *sdl.Renderer, x, y int32) *gobject.Gobject {
+	BulletId += 1
+	strId := "bullet" + strconv.Itoa(BulletId)
+	return gobject.NewGobject(
+		r,
+		"assets/bullet.png",
+		"",
+		"",
+		strId,
+		x,
+		y-35,
+		WindowWidth,
+		WindowHeight,
+		true,
+	)
 }
