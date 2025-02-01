@@ -28,7 +28,7 @@ var (
 	isExit    bool
 	// Maybe later
 	players, enemies, bullets map[string]*gobject.Gobject
-	BulletId                  int
+	BulletId, UfoId           int
 )
 
 // Error checker
@@ -59,6 +59,7 @@ func main() {
 	perror(err)
 	defer rend.Destroy()
 
+	destroyed := make(map[string]int)
 	// Create player
 	player := gobject.NewGobject(
 		rend,
@@ -72,6 +73,7 @@ func main() {
 		WindowHeight,
 		true,
 	)
+	player.Destroyed = destroyed
 	ufo1 := gobject.NewGobject(
 		rend,
 		"assets/ufo.png",
@@ -141,6 +143,19 @@ func main() {
 startGame:
 	// Game loop
 	for isRunning {
+		score := 0
+		if len(player.Destroyed) > 0 {
+			for _, v := range player.Destroyed {
+				score += v
+			}
+		}
+		player.Score = score
+		if player.Score%400 == 0 && len(manager.Enemies) == 0 {
+			for i := 1; i < 5; i++ {
+				newUfo := NewUfo(rend, int32(i*200), int32(i*100))
+				manager.Enemies[newUfo.Id] = newUfo
+			}
+		}
 		frameStartTime := sdl.GetTicks()
 
 		isRunning, isExit = inputs.Listen(isRunning)
@@ -169,6 +184,7 @@ startGame:
 			shot = manager.ScanShoot()
 		} else {
 			player.Draw(rend)
+			loss(player)
 		}
 
 		if shot {
@@ -231,7 +247,7 @@ paused:
 		if isRunning {
 			goto startGame
 		}
-		isRunning = drawText()
+		isRunning = showPause("PAUSED")
 	}
 	if isExit {
 		for _, val := range enemies {
@@ -242,9 +258,10 @@ paused:
 	}
 }
 
-func drawText() bool {
+func showPause(message string) bool {
+	var resp bool
 	buttons := []sdl.MessageBoxButtonData{
-		{Flags: sdl.MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, ButtonID: 0, Text: "cancel PAUSE"},
+		{Flags: sdl.MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, ButtonID: 0, Text: "cancel " + message},
 	}
 
 	colorScheme := sdl.MessageBoxColorScheme{
@@ -260,7 +277,7 @@ func drawText() bool {
 	messageboxdata := sdl.MessageBoxData{
 		Flags:       sdl.MESSAGEBOX_INFORMATION,
 		Window:      nil,
-		Title:       "PAUSED",
+		Title:       message,
 		Message:     "",
 		Buttons:     buttons,
 		ColorScheme: &colorScheme,
@@ -268,10 +285,10 @@ func drawText() bool {
 
 	buttonid, _ := sdl.ShowMessageBox(&messageboxdata)
 
-	if buttonid == 1 {
-		return false
+	if buttonid != 1 {
+		resp = true
 	}
-	return true
+	return resp
 }
 
 func NewBullet(r *sdl.Renderer, x, y int32) *gobject.Gobject {
@@ -283,10 +300,47 @@ func NewBullet(r *sdl.Renderer, x, y int32) *gobject.Gobject {
 		"",
 		"",
 		strId,
-		x,
+		x+30,
 		y-35,
 		WindowWidth,
 		WindowHeight,
 		true,
 	)
+}
+
+func NewUfo(r *sdl.Renderer, x, y int32) *gobject.Gobject {
+	UfoId += 1
+	strId := "bullet" + strconv.Itoa(UfoId)
+	return gobject.NewGobject(
+		rend,
+		"assets/ufo.png",
+		"assets/exp.png",
+		"",
+		strId,
+		x,
+		y,
+		WindowWidth,
+		WindowHeight,
+		true,
+	)
+}
+
+func loss(player *gobject.Gobject) {
+	_ = showPause("LOSS")
+	for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+		switch t := event.(type) {
+		case *sdl.QuitEvent:
+			fmt.Println(t)
+			isExit = true
+			isRunning = false
+			break
+		}
+	}
+	if isExit {
+		for _, val := range enemies {
+			val.Free()
+		}
+		player.Free()
+		sdl.Quit()
+	}
 }

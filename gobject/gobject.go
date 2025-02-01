@@ -42,6 +42,7 @@ type Gobject struct {
 	IsShoot           bool
 	Direction         sdl.FPoint
 	Score, ShootDelay int
+	Destroyed         map[string]int
 }
 
 // NewGobject creates new game object
@@ -344,8 +345,9 @@ func (gob *Gobject) UpMoving(r *sdl.Renderer, objects map[string]*Gobject, bulle
 							gob.Y+gob.Rect().H <= obj.Y) {
 							obj.IsMoving = false
 							gob.IsMoving = false
+							player.Destroyed[obj.Id] = 100
 							obj.Destroy(r)
-							player.Score += 100
+							//player.Score += 100
 							delete(objects, key)
 						}
 					}
